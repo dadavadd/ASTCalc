@@ -12,5 +12,8 @@ public enum TokenType
 	RightParen,
 	Function,
 	Comma,
-	EOF
+	EOF,
+	Factorial,
+	Percent,
+	Identifier
 }

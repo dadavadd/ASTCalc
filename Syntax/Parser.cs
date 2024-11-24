@@ -1,19 +1,14 @@
 ﻿using ASTCalc.Lexer;
 using ASTCalc.Syntax.Nodes;
-using System.Globalization;
+using System.Globalization; 
 
 namespace ASTCalc.Syntax;
 
-public class Parser
+public class Parser(List<Token> tokens)
 {
-	private readonly List<Token> _tokens;
+	private readonly List<Token> _tokens = tokens;
 	private int _position = 0;
 	private static readonly CultureInfo ParsingCulture = CultureInfo.InvariantCulture;
-
-	public Parser(List<Token> tokens)
-	{
-		_tokens = tokens;
-	}
 
 	private Token Current => _tokens[_position];
 
@@ -73,7 +68,8 @@ public class Parser
 	{
 		if (Current.Type == TokenType.Function)
 		{
-			var functionName = Current.Value;
+			var function = Current.Function ?? 
+				throw new Exception("Внутренняя ошибка: функция не определена");
 			Advance();
 
 			if (Current.Type != TokenType.LeftParen)
@@ -86,15 +82,36 @@ public class Parser
 				throw new Exception("Ожидалась закрывающая скобка");
 
 			Advance();
-			return new FunctionNode(functionName, argument);
+			return new FunctionNode(function, argument);
 		}
 
+		var node = Primary();
+
+		while (Current.Type == TokenType.Factorial || Current.Type == TokenType.Percent)
+		{
+			if (Current.Type == TokenType.Factorial)
+			{
+				Advance();
+				node = new FactorialNode(node);
+			}
+			else if (Current.Type == TokenType.Percent)
+			{
+				Advance();
+				node = new BinaryOpNode(node, TokenType.Multiply, new NumberNode(0.01));
+			}
+		}
+
+		return node;
+	}
+
+	private AstNode Primary()
+	{
 		var token = Current;
 
 		if (token.Type == TokenType.Number)
 		{
 			Advance();
-			if (!double.TryParse(token.Value, NumberStyles.Any, ParsingCulture, out double number))
+			if (!double.TryParse(token.Value, NumberStyles.Any, ParsingCulture, out var number))
 				throw new Exception($"Не удалось преобразовать '{token.Value}' в число");
 			return new NumberNode(number);
 		}
@@ -107,6 +124,12 @@ public class Parser
 				throw new Exception("Ожидалась закрывающая скобка");
 			Advance();
 			return node;
+		}
+
+		if (token.Type == TokenType.Minus)
+		{
+			Advance();
+			return new BinaryOpNode(new NumberNode(0), TokenType.Minus, Primary());
 		}
 
 		throw new Exception("Ожидалось число или открывающая скобка");
